@@ -36,12 +36,11 @@ class Trainer():
             ('preproc', preproc_pipe),
             ('linear_model', LinearRegression())
         ])
-        
-        self.pipeline = pipe
-        return self
+        return pipe
 
     def run(self):
         """set and train the pipeline"""
+        self.pipeline = self.set_pipeline()
         self.pipeline.fit(self.X, self.y)
         return self
 
@@ -64,7 +63,6 @@ if __name__ == "__main__":
     X_train, X_val, y_train, y_val = hold_out(X,y)
     # train
     trainer = Trainer(X_train,y_train)
-    trainer.set_pipeline()
     trainer.run()
     # evaluate
     trainer.evaluate(X_val, y_val)
