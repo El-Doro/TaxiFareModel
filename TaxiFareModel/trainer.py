@@ -2,7 +2,13 @@
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.linear_model import LinearRegression
+
+from sklearn.linear_model import LinearRegression, SGDRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
+
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import mean_squared_error
 
 from TaxiFareModel.encoders import DistanceTransformer, TimeFeaturesEncoder
 from TaxiFareModel.data import get_data, clean_data, get_Xy, hold_out
@@ -13,9 +19,10 @@ import mlflow
 
 from memoized_property import memoized_property
 
-MLFLOW_URI = "https://mlflow.lewagon.co/"
-EXPERIMENT_NAME = "[FR] [Paris] [PhilippeLD] LinearRegression" 
+import joblib
 
+MLFLOW_URI = "https://mlflow.lewagon.co/"
+EXPERIMENT_NAME = "[FR] [Paris] [El-Doro] LinearRegression" 
 
 class Trainer():
     def __init__(self, X, y):
@@ -68,14 +75,14 @@ class Trainer():
         ], remainder="drop")
         pipe = Pipeline([
             ('preproc', preproc_pipe),
-            ('linear_model', LinearRegression())
+            ('linear_model', RandomForestRegressor())
         ])
         return pipe
 
-    def run(self):
+    def run(self): 
         """set and train the pipeline"""
         self.pipeline = self.set_pipeline()
-        self.pipeline.fit(self.X, self.y)
+        self.pipeline.fit(self.X, self.y)   
         return self
 
     def evaluate(self, X_test, y_test):
@@ -86,6 +93,31 @@ class Trainer():
         self.mlflow_log_metric("rmse", rmse)
         self.mlflow_log_param("model", self.pipeline.get_params()['linear_model'])
         return rmse
+    
+    def save_model(self):
+        """ Save the trained model into a model.joblib file """
+        joblib.dump(self.pipeline, 'model.joblib')
+        return self
+    
+    def run_grid_search(self):
+        grid = {}
+        
+        df = get_data()
+        df = clean_data(df)
+        X,y = get_Xy(df)
+        
+        
+        X_train, X_val, y_train, y_val = hold_out(X,y)
+        trainer = Trainer(X_train,y_train)
+        self.pipeline = trainer.set_pipeline()
+        
+        search = GridSearchCV(self.pipeline, grid, 
+                           scoring = 'neg_mean_squared_error',
+                           cv = 5,
+                           n_jobs=-1)
+        
+        search.fit(X_train,y_train)
+        return search
 
 
 if __name__ == "__main__":
@@ -102,4 +134,6 @@ if __name__ == "__main__":
     trainer.run()
     # evaluate
     trainer.evaluate(X_val, y_val)
+    # save model
+    trainer.save_model()
     
